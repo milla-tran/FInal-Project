@@ -3,6 +3,8 @@ library(fpp3)
 # Creating Index ----------------------------------------------------------
 
 library(lubridate)
+library(readr)
+credit <- read_csv("credit.csv")
 date <- c(Sys.Date(),Sys.Date() - months(1),Sys.Date() - months(2),Sys.Date()-months(3), Sys.Date()-months(4),Sys.Date()-months(5),
           Sys.Date() - months(6),Sys.Date() - months(7),Sys.Date()-months(8), Sys.Date()-months(9),Sys.Date()-months(10),
           Sys.Date() - months(11),Sys.Date() - months(12),Sys.Date()-months(13), Sys.Date()-months(14),Sys.Date()-months(15),
@@ -105,7 +107,34 @@ date <- c(Sys.Date(),Sys.Date() - months(1),Sys.Date() - months(2),Sys.Date()-mo
 date
 credit$Month <- date
 
-credit %>% 
+Credit <- credit %>% 
   mutate(Month=yearmonth(Month)) %>% 
   as_tsibble(index=Month)
 
+
+
+
+# Transformation ----------------------------------------------------------
+Credit %>% autoplot()
+# Homoskedastic so no mathematical transformations needed
+# There is a trend so it is not stationary
+Credit %>% ACF(credit_in_millions) %>% 
+  autoplot() + labs(subtitle = "Credit in Millions")
+# The ACF plot also shows that it is not stationary
+Credit %>%
+  features(credit_in_millions, unitroot_kpss)
+# The p-value is less than 0.01 so the data is not stationary
+Credit %>% 
+  features(credit_in_millions,unitroot_ndiffs)
+# One difference is required to make the data stationary
+Credit %>% 
+  features(credit_in_millions,unitroot_nsdiffs)
+# No seasonal difference is required
+Credit %>% 
+  mutate(differenced_credit = difference(credit_in_millions)) %>% 
+  select(differenced_credit) %>% autoplot()
+Credit %>% 
+  mutate(differenced_credit = difference(credit_in_millions)) %>% 
+  ACF(differenced_credit) %>% autoplot() + labs(subtitle="Changes in Credit in Millions")
+Credit <- Credit %>% 
+  mutate(differenced_credit = difference(credit_in_millions))
