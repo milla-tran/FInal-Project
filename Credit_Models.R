@@ -138,3 +138,91 @@ Credit %>%
   ACF(differenced_credit) %>% autoplot() + labs(subtitle="Changes in Credit in Millions")
 Credit <- Credit %>% 
   mutate(differenced_credit = difference(credit_in_millions))
+
+# Modeling 1 --------------------------------------------------------------
+#Linear Models (Exponential, Trend, Piecewise)
+fit_linear <- Credit %>% 
+  model(trend_model = TSLM(credit_in_millions ~ trend()),
+        exponential = TSLM(log(credit_in_millions) ~ trend()),
+        piecewise = TSLM(credit_in_millions ~ trend(knots = c(head(Credit$Month,1), tail(Credit$Month,1))))
+        )
+report(fit_linear)
+
+#Checking Residuals 
+augment(fit_linear)
+
+#Plotting Model With Credit Values
+Credit %>%
+  autoplot(credit_in_millions) +
+  geom_line(data = fitted(fit_linear),
+            aes(y = .fitted, colour = .model)) +
+  labs(y = "Minutes",
+       title = "Boston marathon winning times")
+
+# Viewing the plot alone tells us these models are bad. The models seem to not follow the data well, but they do follow the trend. Overall, these models are poor.
+
+
+#Fourier Model
+fit_fourier <- Credit %>%
+  model(m1 = TSLM(differenced_credit ~ trend() + fourier(K = 1)),
+  m2 = TSLM(differenced_credit ~ trend() + fourier(K = 2)),
+  m3 = TSLM(differenced_credit ~ trend() + fourier(K = 3)),
+  m4 = TSLM(differenced_credit ~ trend() + fourier(K = 4)),
+  m5 = TSLM(differenced_credit ~ trend() + fourier(K = 5)),
+  m6 = TSLM(differenced_credit ~ trend() + fourier(K = 6)))
+
+#Selecting Best Fit Based on AIC
+glance(fit_fourier) %>%
+  arrange(AIC, CV)
+
+best_fit_fourier <- fit_fourier %>%
+  select(m1)
+
+#Viewing Residuals 
+gg_tsresiduals(best_fit_fourier)
+
+#Viewing Plot
+augment(best_fit_fourier) %>%
+  ggplot(aes(x = Month)) +
+  geom_line(aes(y = differenced_credit, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  labs(y = NULL,
+       title = "Linear Model Based on Differenced Credit")
+
+#The model with the lowest AIC is model 1 with one harmonic. Its residuals seem to me normally distributed. The center of spread for the residuals seems to be 0, but there are a lot of extreme values. The ACF plot shows little significance. The harmonics seem to give a bad model.
+
+
+#X11 Decomp Model Creation
+x11_dcmp <- Credit %>%
+  model(x11 = X_13ARIMA_SEATS(differenced_credit ~ x11())) %>%
+  components()
+autoplot(x11_dcmp) +
+  labs(title =
+         "Decomposition of Credits data using X-11")
+
+#X11 Decomp Model Graphing
+x11_dcmp %>%
+  ggplot(aes(x = Month)) +
+  geom_line(aes(y = differenced_credit, colour = "Data")) +
+  geom_line(aes(y = season_adjust,
+                colour = "Seasonally Adjusted")) +
+  geom_line(aes(y = trend, colour = "Trend")) +
+  labs(y = "Persons (thousands)",
+       title = "Differenced credit total by month") +
+  scale_colour_manual(
+    values = c("dark gray", "#0072B2", "#D55E00"),
+    breaks = c("Data", "Seasonally Adjusted", "Trend")
+  )
+#The seasonally adjusted model seems to follow the data closely without missing too much. It might make a good forecast. The trend model seems to be lacking, though, although it does seem to follow the data.
+
+#ETS Model Creation
+fit_exponential <- Credit %>%
+  model(ETS(credit_in_millions))
+report(fit_exponential)
+
+#ETS Model Examination
+components(fit_exponential) %>%
+  autoplot() +
+  labs(title = "ETS(M,N,A) components")
+#The remainder for the ETS, the residuals, seems to be heteroskedastic, has extreme values, and is not very centered on zero. Additionally, it plays a large part in the predictions made by the model. The ETS would not be a great model.
+  
