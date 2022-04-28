@@ -150,6 +150,7 @@ report(fit_linear)
 
 #Checking Residuals 
 augment(fit_linear)
+accuracy(fit_linear)
 
 #Plotting Model With Credit Values
 Credit %>%
@@ -159,7 +160,7 @@ Credit %>%
   labs(y = "Minutes",
        title = "Boston marathon winning times")
 
-# Viewing the plot alone tells us these models are bad. The models seem to not follow the data well, but they do follow the trend. Overall, these models are poor.
+# Viewing the plot alone tells us these models are bad. The models seem to not follow the data well, but they do follow the trend. Overall, these models are poor. To back this up, the RMSEs indicate misses by 121,000 and 124,000 credits for the trend and piecewise models and the exponential model, respectively.
 
 
 #Fourier Model
@@ -180,6 +181,7 @@ best_fit_fourier <- fit_fourier %>%
 
 #Viewing Residuals 
 gg_tsresiduals(best_fit_fourier)
+accuracy(best_fit_fourier)
 
 #Viewing Plot
 augment(best_fit_fourier) %>%
@@ -189,31 +191,7 @@ augment(best_fit_fourier) %>%
   labs(y = NULL,
        title = "Linear Model Based on Differenced Credit")
 
-#The model with the lowest AIC is model 1 with one harmonic. Its residuals seem to me normally distributed. The center of spread for the residuals seems to be 0, but there are a lot of extreme values. The ACF plot shows little significance. The harmonics seem to give a bad model.
-
-
-#X11 Decomp Model Creation
-x11_dcmp <- Credit %>%
-  model(x11 = X_13ARIMA_SEATS(differenced_credit ~ x11())) %>%
-  components()
-autoplot(x11_dcmp) +
-  labs(title =
-         "Decomposition of Credits data using X-11")
-
-#X11 Decomp Model Graphing
-x11_dcmp %>%
-  ggplot(aes(x = Month)) +
-  geom_line(aes(y = differenced_credit, colour = "Data")) +
-  geom_line(aes(y = season_adjust,
-                colour = "Seasonally Adjusted")) +
-  geom_line(aes(y = trend, colour = "Trend")) +
-  labs(y = "Persons (thousands)",
-       title = "Differenced credit total by month") +
-  scale_colour_manual(
-    values = c("dark gray", "#0072B2", "#D55E00"),
-    breaks = c("Data", "Seasonally Adjusted", "Trend")
-  )
-#The seasonally adjusted model seems to follow the data closely without missing too much. It might make a good forecast. The trend model seems to be lacking, though, although it does seem to follow the data.
+#The model with the lowest AIC is model 1 with one harmonic. Its residuals seem to me normally distributed. The center of spread for the residuals seems to be 0, but there are a lot of extreme values. The ACF plot shows little significance. The harmonics seem to give a bad model. The RMSE is .0998, which means the model misses on average by nearly 100,000 credits.
 
 #ETS Model Creation
 fit_exponential <- Credit %>%
@@ -225,4 +203,15 @@ components(fit_exponential) %>%
   autoplot() +
   labs(title = "ETS(M,N,A) components")
 #The remainder for the ETS, the residuals, seems to be heteroskedastic, has extreme values, and is not very centered on zero. Additionally, it plays a large part in the predictions made by the model. The ETS would not be a great model.
+
+#Non-seasonal ARIMA model fit
+fit_ARIMA <- Credit %>%
+  model(ARIMA(differenced_credit))
+report(fit_ARIMA)
   
+#Checking model
+gg_tsresiduals(fit_ARIMA)
+accuracy(fit_ARIMA)
+
+
+#The non-seasonal ARIMA seems to be a 3,0,0 model. It has an RMSE of .0912 on the differenced credit. This indicates a miss of about 912,000 credits, which is the lowest RMSE seen so far. The residuals seem to be normally distributed and centered around 0, but there a couple extreme residuals as well.
