@@ -110,7 +110,7 @@ credit$Month <- date
 Credit <- credit %>% 
   mutate(Month=yearmonth(Month)) %>% 
   as_tsibble(index=Month)
-
+Credit
 
 
 
@@ -139,13 +139,96 @@ Credit %>%
 Credit <- Credit %>% 
   mutate(differenced_credit = difference(credit_in_millions))
 
-# Modeling 1 --------------------------------------------------------------
+# Modeling 2 using Train dataset --------------------------------------------------------------
 #Linear Models (Exponential, Trend, Piecewise)
-fit_linear <- Credit %>% 
+fit_linear <- Train %>% 
   model(trend_model = TSLM(credit_in_millions ~ trend()),
         exponential = TSLM(log(credit_in_millions) ~ trend()),
         piecewise = TSLM(credit_in_millions ~ trend(knots = c(head(Credit$Month,1), tail(Credit$Month,1))))
         )
+report(fit_linear)
+
+#Checking Residuals 
+augment(fit_linear)
+accuracy(fit_linear)
+
+#Plotting Model With Credit Values
+Train %>%
+  autoplot(credit_in_millions) +
+  geom_line(data = fitted(fit_linear),
+            aes(y = .fitted, colour = .model)) +
+  labs(y = "Minutes",
+       title = "Boston marathon winning times")
+
+# Viewing the plot alone tells us these models are bad. The models seem to not follow the data well, but they do follow the trend. Overall, these models are poor. To back this up, the RMSEs indicate misses by 121,000 and 124,000 credits for the trend and piecewise models and the exponential model, respectively.
+
+
+#Fourier Model
+fit_fourier <- Train %>%
+  model(m1 = TSLM(differenced_credit ~ trend() + fourier(K = 1)),
+  m2 = TSLM(differenced_credit ~ trend() + fourier(K = 2)),
+  m3 = TSLM(differenced_credit ~ trend() + fourier(K = 3)),
+  m4 = TSLM(differenced_credit ~ trend() + fourier(K = 4)),
+  m5 = TSLM(differenced_credit ~ trend() + fourier(K = 5)),
+  m6 = TSLM(differenced_credit ~ trend() + fourier(K = 6)))
+
+#Selecting Best Fit Based on AIC
+glance(fit_fourier) %>%
+  arrange(AIC, CV)
+
+best_fit_fourier <- fit_fourier %>%
+  select(m1)
+
+#Viewing Residuals 
+gg_tsresiduals(best_fit_fourier)
+accuracy(best_fit_fourier)
+
+#Viewing Plot
+augment(best_fit_fourier) %>%
+  ggplot(aes(x = Month)) +
+  geom_line(aes(y = differenced_credit, colour = "Data")) +
+  geom_line(aes(y = .fitted, colour = "Fitted")) +
+  labs(y = NULL,
+       title = "Linear Model Based on Differenced Credit")
+
+#The model with the lowest AIC is model 1 with one harmonic. Its residuals seem to me normally distributed. The center of spread for the residuals seems to be 0, but there are a lot of extreme values. The ACF plot shows little significance. The harmonics seem to give a bad model. The RMSE is .0998, which means the model misses on average by nearly 100,000 credits.
+
+#ETS Model Creation
+fit_exponential <- Train %>%
+  model(ETS(credit_in_millions))
+report(fit_exponential)
+
+#ETS Model Examination
+components(fit_exponential) %>%
+  autoplot() +
+  labs(title = "ETS(M,N,A) components")
+#The remainder for the ETS, the residuals, seems to be heteroskedastic, has extreme values, and is not very centered on zero. Additionally, it plays a large part in the predictions made by the model. The ETS would not be a great model.
+
+#Non-seasonal ARIMA model fit
+fit_ARIMA <- Train %>%
+  model(ARIMA(differenced_credit))
+report(fit_ARIMA)
+  
+#Checking model
+gg_tsresiduals(fit_ARIMA)
+accuracy(fit_ARIMA)
+
+
+#The non-seasonal ARIMA seems to be a 3,0,0 model. It has an RMSE of .0912 on the differenced credit. This indicates a miss of about 912,000 credits, which is the lowest RMSE seen so far. The residuals seem to be normally distributed and centered around 0, but there a couple extreme residuals as well.
+
+
+#Created a Trai  and Holdout dataset using the 80/20 rule.
+Train <- Credit %>%
+  filter(Month <= yearmonth("2014 Feb"))
+
+Holdout <- Credit %>%
+  filter(Month > yearmonth("2014 Feb"))
+
+fit_linear <- Credit %>% 
+  model(trend_model = TSLM(credit_in_millions ~ trend()),
+        exponential = TSLM(log(credit_in_millions) ~ trend()),
+        piecewise = TSLM(credit_in_millions ~ trend(knots = c(head(Credit$Month,1), tail(Credit$Month,1))))
+  )
 report(fit_linear)
 
 #Checking Residuals 
@@ -166,11 +249,11 @@ Credit %>%
 #Fourier Model
 fit_fourier <- Credit %>%
   model(m1 = TSLM(differenced_credit ~ trend() + fourier(K = 1)),
-  m2 = TSLM(differenced_credit ~ trend() + fourier(K = 2)),
-  m3 = TSLM(differenced_credit ~ trend() + fourier(K = 3)),
-  m4 = TSLM(differenced_credit ~ trend() + fourier(K = 4)),
-  m5 = TSLM(differenced_credit ~ trend() + fourier(K = 5)),
-  m6 = TSLM(differenced_credit ~ trend() + fourier(K = 6)))
+        m2 = TSLM(differenced_credit ~ trend() + fourier(K = 2)),
+        m3 = TSLM(differenced_credit ~ trend() + fourier(K = 3)),
+        m4 = TSLM(differenced_credit ~ trend() + fourier(K = 4)),
+        m5 = TSLM(differenced_credit ~ trend() + fourier(K = 5)),
+        m6 = TSLM(differenced_credit ~ trend() + fourier(K = 6)))
 
 #Selecting Best Fit Based on AIC
 glance(fit_fourier) %>%
@@ -205,13 +288,26 @@ components(fit_exponential) %>%
 #The remainder for the ETS, the residuals, seems to be heteroskedastic, has extreme values, and is not very centered on zero. Additionally, it plays a large part in the predictions made by the model. The ETS would not be a great model.
 
 #Non-seasonal ARIMA model fit
-fit_ARIMA <- Credit %>%
+fit_ARIMA <- Train %>%
   model(ARIMA(differenced_credit))
 report(fit_ARIMA)
-  
+
 #Checking model
 gg_tsresiduals(fit_ARIMA)
 accuracy(fit_ARIMA)
 
 
-#The non-seasonal ARIMA seems to be a 3,0,0 model. It has an RMSE of .0912 on the differenced credit. This indicates a miss of about 912,000 credits, which is the lowest RMSE seen so far. The residuals seem to be normally distributed and centered around 0, but there a couple extreme residuals as well.
+
+
+
+#transformed data attempting to fix seasonality and trend, but doesn't make much of a difference.
+lambda <- Credit %>%
+  features(credit_in_millions, features = guerrero) %>%
+  pull(lambda_guerrero)
+Credit %>%
+  autoplot(box_cox(credit_in_millions, lambda)) +
+  labs(y = "",
+       title = latex2exp::TeX(paste0(
+         "Transformed credit in millions with $\\lambda$ = ",
+         round(lambda,2)))) 
+
