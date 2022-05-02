@@ -218,4 +218,14 @@ report(fit_ARIMA)
 gg_tsresiduals(fit_ARIMA)
 accuracy(fit_ARIMA)
 
-#The non-seasonal ARIMA seems to be a 3,0,0 model. It has an RMSE of .0900 on the differenced credit. This indicates a miss of about 900,000 credits, which is the lowest RMSE seen so far. The residuals seem to be normally distributed and centered around 0, but there a couple extreme residuals as well.
+#The non-seasonal ARIMA seems to be a 3,0,0 model. It has an RMSE of .0900 on the differenced credit. This indicates a miss of about 900,000 credits. The residuals seem to be normally distributed and centered around 0, but there a couple extreme residuals as well.
+
+
+# Predictions -------------------------------------------------------------
+# We decided on ETS model because it has the smallest RMSE.
+preds <- fit_exponential %>% forecast(h=12)
+preds %>% autoplot(Credit2) + autolayer(pred,credit_in_millions)
+predictions <- data.frame(Period.in.Future = c(1,2,3,4,5,6,7,8,9,10,11,12),
+                          Prediction.for.Credit.in.Millions = preds$.mean)
+write.csv(predictions,"C:\\Desktop\\Final-Project\\predictions.csv")
+predictions
