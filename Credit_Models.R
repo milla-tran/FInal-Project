@@ -145,7 +145,7 @@ fit_linear <- Credit %>%
   model(trend_model = TSLM(credit_in_millions ~ trend()),
         exponential = TSLM(log(credit_in_millions) ~ trend()),
         piecewise = TSLM(credit_in_millions ~ trend(knots = c(head(Credit$Month,1), tail(Credit$Month,1))))
-        )
+  )
 report(fit_linear)
 
 #Checking Residuals 
@@ -157,8 +157,8 @@ Credit %>%
   autoplot(credit_in_millions) +
   geom_line(data = fitted(fit_linear),
             aes(y = .fitted, colour = .model)) +
-  labs(y = "Minutes",
-       title = "Boston marathon winning times")
+  labs(y = "Credits in Millions",
+       title = "Exponential, Piece-wise, and Trend Model of Credits")
 
 # Viewing the plot alone tells us these models are bad. The models seem to not follow the data well, but they do follow the trend. Overall, these models are poor. To back this up, the RMSEs indicate misses by 121,000 and 124,000 credits for the trend and piecewise models and the exponential model, respectively.
 
@@ -166,11 +166,11 @@ Credit %>%
 #Fourier Model
 fit_fourier <- Credit %>%
   model(m1 = TSLM(differenced_credit ~ trend() + fourier(K = 1)),
-  m2 = TSLM(differenced_credit ~ trend() + fourier(K = 2)),
-  m3 = TSLM(differenced_credit ~ trend() + fourier(K = 3)),
-  m4 = TSLM(differenced_credit ~ trend() + fourier(K = 4)),
-  m5 = TSLM(differenced_credit ~ trend() + fourier(K = 5)),
-  m6 = TSLM(differenced_credit ~ trend() + fourier(K = 6)))
+        m2 = TSLM(differenced_credit ~ trend() + fourier(K = 2)),
+        m3 = TSLM(differenced_credit ~ trend() + fourier(K = 3)),
+        m4 = TSLM(differenced_credit ~ trend() + fourier(K = 4)),
+        m5 = TSLM(differenced_credit ~ trend() + fourier(K = 5)),
+        m6 = TSLM(differenced_credit ~ trend() + fourier(K = 6)))
 
 #Selecting Best Fit Based on AIC
 glance(fit_fourier) %>%
@@ -208,7 +208,7 @@ components(fit_exponential) %>%
 fit_ARIMA <- Credit %>%
   model(ARIMA(differenced_credit))
 report(fit_ARIMA)
-  
+
 #Checking model
 gg_tsresiduals(fit_ARIMA)
 accuracy(fit_ARIMA)
