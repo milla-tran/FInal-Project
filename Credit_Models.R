@@ -160,8 +160,8 @@ Credit2 %>%
   autoplot(credit_in_millions) +
   geom_line(data = fitted(fit_linear),
             aes(y = .fitted, colour = .model)) +
-  labs(y = "Minutes",
-       title = "Boston marathon winning times")
+  labs(y = "Imperial credits in Millions",
+       title = "Modeling Imperial Credits over Time")
 
 # Viewing the plot alone tells us these models are bad. The models seem to not follow the data well, but they do follow the trend. Overall, these models are poor. To back this up, the RMSEs indicate misses by 123,000 and 124,000 credits for the trend and piecewise models and the exponential model, respectively.
 
