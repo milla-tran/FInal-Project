@@ -218,7 +218,25 @@ report(fit_ARIMA)
 gg_tsresiduals(fit_ARIMA)
 accuracy(fit_ARIMA)
 
+
 #The non-seasonal ARIMA seems to be a 3,0,0 model. It has an RMSE of .0900 on the differenced credit. This indicates a miss of about 900,000 credits. The residuals seem to be normally distributed and centered around 0, but there a couple extreme residuals as well.
+
+#CV
+Credit2 <- Credit %>%
+  CreditStretch <- Credit2 %>%
+  stretch_tsibble(.init = 3, .step = 1) %>%
+  relocate(credit_in_millions, Month, .id)
+CreditStretch
+
+# TSCV accuracy
+CreditStretch %>%
+  model(RandomWalk = RW(credit_in_millions ~ drift()),
+        Naive = NAIVE(credit_in_millions),
+        Mean = MEAN(credit_in_millions),
+        Arima = ARIMA(credit_in_millions),
+        hw = ETS(credit_in_millions ~ error("M") + trend("Ad") + season("M"))) %>%
+  forecast(h = 12) %>%
+  accuracy(Credit2)  
 
 
 # Predictions -------------------------------------------------------------
