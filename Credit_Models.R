@@ -140,31 +140,35 @@ Credit <- Credit %>%
   mutate(differenced_credit = difference(credit_in_millions))
 
 # Modeling 1 --------------------------------------------------------------
+#Training
+Credit2 <- head(Credit,nrow(Credit)*.8)
+
 #Linear Models (Exponential, Trend, Piecewise)
-fit_linear <- Credit %>% 
+fit_linear <- Credit2 %>% 
   model(trend_model = TSLM(credit_in_millions ~ trend()),
         exponential = TSLM(log(credit_in_millions) ~ trend()),
         piecewise = TSLM(credit_in_millions ~ trend(knots = c(head(Credit$Month,1), tail(Credit$Month,1))))
         )
 report(fit_linear)
 
-#Checking Residuals 
+#Checking Residuals, Error 
 augment(fit_linear)
 accuracy(fit_linear)
 
 #Plotting Model With Credit Values
-Credit %>%
+Credit2 %>%
   autoplot(credit_in_millions) +
   geom_line(data = fitted(fit_linear),
             aes(y = .fitted, colour = .model)) +
   labs(y = "Minutes",
        title = "Boston marathon winning times")
 
-# Viewing the plot alone tells us these models are bad. The models seem to not follow the data well, but they do follow the trend. Overall, these models are poor. To back this up, the RMSEs indicate misses by 121,000 and 124,000 credits for the trend and piecewise models and the exponential model, respectively.
+# Viewing the plot alone tells us these models are bad. The models seem to not follow the data well, but they do follow the trend. Overall, these models are poor. To back this up, the RMSEs indicate misses by 123,000 and 124,000 credits for the trend and piecewise models and the exponential model, respectively.
 
 
 #Fourier Model
-fit_fourier <- Credit %>%
+
+fit_fourier <- Credit2 %>%
   model(m1 = TSLM(differenced_credit ~ trend() + fourier(K = 1)),
   m2 = TSLM(differenced_credit ~ trend() + fourier(K = 2)),
   m3 = TSLM(differenced_credit ~ trend() + fourier(K = 3)),
@@ -191,10 +195,10 @@ augment(best_fit_fourier) %>%
   labs(y = NULL,
        title = "Linear Model Based on Differenced Credit")
 
-#The model with the lowest AIC is model 1 with one harmonic. Its residuals seem to me normally distributed. The center of spread for the residuals seems to be 0, but there are a lot of extreme values. The ACF plot shows little significance. The harmonics seem to give a bad model. The RMSE is .0998, which means the model misses on average by nearly 100,000 credits.
+#The model with the lowest AIC is model 1 with one harmonic. Its residuals seem to me normally distributed. The center of spread for the residuals seems to be 0, but there are a lot of extreme values. The ACF plot shows little significance. The harmonics seem to give a bad model. The RMSE is .0986, which means the model misses on average by nearly 100,000 credits.
 
 #ETS Model Creation
-fit_exponential <- Credit %>%
+fit_exponential <- Credit2 %>%
   model(ETS(credit_in_millions))
 report(fit_exponential)
 
@@ -202,10 +206,11 @@ report(fit_exponential)
 components(fit_exponential) %>%
   autoplot() +
   labs(title = "ETS(M,N,A) components")
-#The remainder for the ETS, the residuals, seems to be heteroskedastic, has extreme values, and is not very centered on zero. Additionally, it plays a large part in the predictions made by the model. The ETS would not be a great model.
+accuracy(fit_exponential)
+#The remainder for the ETS, the residuals, seem to be heteroskedastic, have extreme values, but is somewhat centered on zero. The RMSE is .0868, denoting an average miss of 868,000 credits.
 
 #Non-seasonal ARIMA model fit
-fit_ARIMA <- Credit %>%
+fit_ARIMA <- Credit2 %>%
   model(ARIMA(differenced_credit))
 report(fit_ARIMA)
   
@@ -213,5 +218,41 @@ report(fit_ARIMA)
 gg_tsresiduals(fit_ARIMA)
 accuracy(fit_ARIMA)
 
+#The non-seasonal ARIMA seems to be a 3,0,0 model. It has an RMSE of .0900 on the differenced credit. This indicates a miss of about 900,000 credits, which is the lowest RMSE seen so far. The residuals seem to be normally distributed and centered around 0, but there a couple extreme residuals as well.
 
-#The non-seasonal ARIMA seems to be a 3,0,0 model. It has an RMSE of .0912 on the differenced credit. This indicates a miss of about 912,000 credits, which is the lowest RMSE seen so far. The residuals seem to be normally distributed and centered around 0, but there a couple extreme residuals as well.
+#fitting to holdout
+Credit3 <- tail(Credit,.2*nrow(Credit))
+
+Credit_stretch <- Credit %>%
+  slice(-n()) %>%
+  stretch_tsibble(.init = 1)
+
+Credit_stretch %>%
+  model(m1 = TSLM(credit_in_millions ~ trend() + fourier(K = 1)),
+        m2 = TSLM(credit_in_millions ~ trend() + fourier(K = 2)),
+        m3 = TSLM(credit_in_millions ~ trend() + fourier(K = 3)),
+        m4 = TSLM(credit_in_millions ~ trend() + fourier(K = 4)),
+        m5 = TSLM(credit_in_millions ~ trend() + fourier(K = 5)),
+        m6 = TSLM(credit_in_millions ~ trend() + fourier(K = 6)),
+        ets = ETS(credit_in_millions),
+        arima = ARIMA(credit_in_millions)
+  ) %>%
+  forecast(h = 12) %>%
+  accuracy(Credit) %>%
+  select(.model, RMSE:MAPE)
+
+mm
+aus_economy <- global_economy %>%
+  filter(Code == "AUS") %>%
+  mutate(Population = Population/1e6)
+
+aus_economy %>%
+  slice(-n()) %>%
+  stretch_tsibble(.init = 10) %>%
+  model(
+    ETS(Population),
+    ARIMA(Population)
+  ) %>%
+  forecast(h = 1) %>%
+  accuracy(aus_economy) %>%
+  select(.model, RMSE:MAPE)
