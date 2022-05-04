@@ -221,6 +221,27 @@ accuracy(fit_ARIMA)
 
 #The non-seasonal ARIMA seems to be a 3,0,0 model. It has an RMSE of .0900 on the differenced credit. This indicates a miss of about 900,000 credits. The residuals seem to be normally distributed and centered around 0, but there a couple extreme residuals as well.
 
+#fitting to holdout
+Credit3 <- tail(Credit,.2*nrow(Credit))
+
+Credit_stretch <- Credit %>%
+  slice(-n()) %>%
+  stretch_tsibble(.init = 1)
+
+Credit_stretch %>%
+  model(m1 = TSLM(credit_in_millions ~ trend() + fourier(K = 1)),
+        m2 = TSLM(credit_in_millions ~ trend() + fourier(K = 2)),
+        m3 = TSLM(credit_in_millions ~ trend() + fourier(K = 3)),
+        m4 = TSLM(credit_in_millions ~ trend() + fourier(K = 4)),
+        m5 = TSLM(credit_in_millions ~ trend() + fourier(K = 5)),
+        m6 = TSLM(credit_in_millions ~ trend() + fourier(K = 6)),
+        ets = ETS(credit_in_millions),
+        arima = ARIMA(credit_in_millions)
+  ) %>%
+  forecast(h = 12) %>%
+  accuracy(Credit) %>%
+  select(.model, RMSE:MAPE)
+
 #CV
 Credit2 <- Credit %>%
   CreditStretch <- Credit2 %>%
