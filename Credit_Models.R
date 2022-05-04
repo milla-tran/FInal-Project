@@ -233,9 +233,10 @@ CreditStretch %>%
   model(RandomWalk = RW(credit_in_millions ~ drift()),
         Naive = NAIVE(credit_in_millions),
         Mean = MEAN(credit_in_millions),
-        Arima = ARIMA(credit_in_millions)) %>%
+        Arima = ARIMA(credit_in_millions),
+        hw = ETS(credit_in_millions ~ error("M") + trend("Ad") + season("M"))) %>%
   forecast(h = 12) %>%
-  accuracy(Credit2) 
+  accuracy(Credit2)  
 
 
 # Predictions -------------------------------------------------------------
