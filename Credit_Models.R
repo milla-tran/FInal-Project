@@ -243,7 +243,7 @@ Credit_stretch %>%
   select(.model, RMSE:MAPE)
 
 #CV
-Credit2 <- Credit %>%
+Credit2 <- Credit 
   CreditStretch <- Credit2 %>%
   stretch_tsibble(.init = 3, .step = 1) %>%
   relocate(credit_in_millions, Month, .id)
